@@ -1,0 +1,62 @@
+# Build klasörleri
+*.obj
+*.exe
+*.ilk
+*.pdb
+*.idb
+*.lib
+*.exp
+
+# VS geçici dosyaları
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Derleme logları
+*.log
+*.tlog
+*.lastbuildstate
+
+# Visual Studio database dosyaları
+*.VC.db
+*.opendb
+*.ipch
+*.iobj
+*.ipdb
+
+# Bin dosyalar ve test çıktıları
+*.bin
+*.cache
+*.bak
+*.tmp
+*.recipe
+
+# VS klasörleri
+.vs/
+Debug/
+Release/
+x64/
+x86/
+
+# IntelliSense
+*.sdf
+*.browse.VC.db
+*.VC.opendb
+
+# IDE ayarları
+*.vcxproj.user
+*.VC.db-shm
+*.VC.db-wal
+*.vscode/
+
+# Backup dosyalar
+*.backup.json
+
+# Çöp dosyalar
+Thumbs.db
+.DS_Store
+
+# Paketlenmiş dosyalar
+*.zip
+*.rar
