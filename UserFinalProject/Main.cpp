@@ -1,24 +1,22 @@
 // main.cpp
-#include "icbytes.h"
-#include "ic_media.h"
-#include "icb_gui.h"
+#include "icbytes.h"   // Bu dosyanýn projenizde olmasý lazým
+#include "ic_media.h" // BU DOSYANIN PROJENÝZDE OLMASI LAZIM! C1083 hatasýnýn sebebi bu.
+#include "icb_gui.h"   // Bu dosyanýn projenizde olmasý lazým
 
 #include <vector>
 #include <string>
-#include <numeric>   // std::accumulate için
-#include <cmath>       // M_PI, cos, sin için (gerçi M_PI Windows'ta doðrudan tanýmlý olmayabilir)
-#include <cstdio>      // sprintf_s için
+#include <numeric>
+#include <cmath>
+#include <cstdio>
 #include <iostream>
+#include <algorithm> // std::min ve std::max için (E0040 hatasý için önemli)
 
-#ifndef M_PI
+#ifndef M_PI, min
 #define M_PI 3.14159265358979323846
+#undef min
 #endif
 
-// Global GUI deðiþkenleri
-int FRM_PieChart_Display;
-ICBYTES pie_chart_image_global;
-
-// Yardýmcý yapý, her dilim için bilgi tutar
+// --- Global Deðiþkenler ve Yapýlar ---
 struct PieSliceInfo {
     std::string label;
     double value;
@@ -26,180 +24,234 @@ struct PieSliceInfo {
     double start_angle_deg;
     double end_angle_deg;
     unsigned int color;
+
+    // Baþlatýlmamýþ üye uyarýsýný gidermek için varsayýlan constructor
+    PieSliceInfo() : value(0.0), percentage(0.0), start_angle_deg(0.0), end_angle_deg(0.0), color(0U) {}
 };
 
-// Pasta Grafik Fonksiyonu
-void CreatePieChart(ICBYTES& img, const std::vector<PieSliceInfo>& slices,
+// GUI için global deðiþkenler
+int FRM_PieChart_Display_Handle;    // Grafik resminin gösterileceði çerçevenin kulpu
+ICBYTES pie_chart_image_global_obj; // Oluþturulan grafik resmini tutan ICBYTES nesnesi
+
+// --- Fonksiyon Prototypleri ---
+void CreatePieChart(ICBYTES& img, const std::vector<PieSliceInfo>& slices_param,
     const char* chart_title, int image_width, int image_height,
     int center_x, int center_y, int radius,
-    unsigned int backcolor = 0xFFFFFFFF, unsigned int textcolor = 0xFF000000) {
+    unsigned int backcolor = 0xFFFAFAFA, unsigned int textcolor = 0xFF000000);
 
-    // Marjlar ve diðer sabitler
-    int top_margin_for_title = 30;      // Baþlýk için üst boþluk
-    int legend_label_offset_x = 25;   // Lejantta renk kutucuðu ile metin arasý boþluk
-    int legend_color_box_size = 15;   // Lejanttaki renk kutucuðunun boyutu
-    int legend_item_spacing_y = 25;   // Lejanttaki satýrlar arasý dikey boþluk
-    int legend_initial_x_offset = 30; // Pastanýn saðýndan lejantýn ne kadar uzakta baþlayacaðý
-    int legend_initial_y_offset = 20; // Baþlýðýn altýndan lejantýn ne kadar aþaðýda baþlayacaðý
+void GenerateAndDisplayPieChart_Main_GUI(const std::vector<std::pair<std::string, double>>& input_raw_data, const char* dynamic_title);
+void TestPieChartWithData1();
+void TestPieChartWithData2();
 
 
-    CreateImage(img, image_width, image_height, ICB_UINT);
-    img = backcolor;
+// --- CreatePieChart Fonksiyonu Implementasyonu ---
+void CreatePieChart(ICBYTES& img, const std::vector<PieSliceInfo>& slices_param,
+    const char* chart_title, int image_width, int image_height,
+    int center_x, int center_y, int radius,
+    unsigned int backcolor, unsigned int textcolor) {
 
-    // Baþlýk
+    int top_margin_for_title = 30;
+    int legend_color_box_size = 15;
+    int legend_item_spacing_y = 25;
+    int legend_initial_x_offset = 30;
+    int legend_initial_y_offset = 20;
+
+    CreateImage(img, image_width, image_height, ICB_UINT); // ICB_UINT 32-bit renk için
+    img = backcolor; // Arka plan rengini ICBYTES atama operatörü ile ayarla
+
+    // Grafik Baþlýðýný Çiz
     if (chart_title && strlen(chart_title) > 0) {
-        int title_len_px = strlen(chart_title) * 12; // Yaklaþýk piksel uzunluðu (12px/char varsayýmý)
-        int title_x_pos = (image_width - title_len_px) / 2; // Resmi ortala
+        size_t title_len = strlen(chart_title);
+        int title_len_px = static_cast<int>(title_len * 12); // Ortalama harf geniþliði 12px varsayýmý
+        int title_x_pos = (image_width - title_len_px) / 2;  // Baþlýðý resmi ortala
         if (title_x_pos < 5) title_x_pos = 5; // Kenara çok yapýþmasýn
-        // Impress12x20 font yüksekliði ~20px. Marjýn ortasýna yerleþtirmek için:
+        // Baþlýðý dikeyde marjýn ortasýna yerleþtir (Impress12x20 font yüksekliði ~20px)
         Impress12x20(img, title_x_pos, (top_margin_for_title - 20) / 2, chart_title, textcolor);
     }
 
-    if (slices.empty()) {
+    // Veri yoksa mesaj göster ve çýk
+    if (slices_param.empty()) {
         Impress12x20(img, 10, top_margin_for_title + 10, "Pasta grafik icin veri yok.", textcolor);
         return;
     }
 
     // Dilimleri Çiz
-    for (const auto& slice : slices) {
-        TiltedEllipseArc(img, center_x, center_y, radius, radius, 0,
+    for (const auto& slice : slices_param) {
+        // Yelpaze Yöntemi ile Basit Dolgu:
+        double start_rad_fill = slice.start_angle_deg * M_PI / 180.0;
+        double end_rad_fill = slice.end_angle_deg * M_PI / 180.0;
+        int num_fill_lines = radius; // Dolgu yoðunluðu (daha fazla çizgi = daha yoðun)
+        if (num_fill_lines <= 0) num_fill_lines = 1; // En az bir çizgi
+        // Açýsal adým (radyan cinsinden)
+        double angle_step_rad_fill = (fabs(end_rad_fill - start_rad_fill) < 1e-6 || num_fill_lines == 0) ? 0 : (end_rad_fill - start_rad_fill) / static_cast<double>(num_fill_lines);
+
+
+        if (fabs(end_rad_fill - start_rad_fill) > 1e-6) { // Sadece anlamlý bir açý varsa doldur
+            for (int j = 0; j <= num_fill_lines; ++j) {
+                double current_fill_angle_rad = start_rad_fill + j * angle_step_rad_fill;
+                int x_on_arc_for_fill = center_x + static_cast<int>(radius * cos(current_fill_angle_rad));
+                int y_on_arc_for_fill = center_y + static_cast<int>(radius * sin(current_fill_angle_rad));
+                Line(img, center_x, center_y, x_on_arc_for_fill, y_on_arc_for_fill, slice.color);
+            }
+        }
+
+        // Dilim hatlarýný dolgudan sonra tekrar çizerek belirginleþtir
+        TiltedEllipseArc(img, center_x, center_y, radius, radius, 0, /*ellipse_tilt_angle*/
             slice.color, static_cast<int>(slice.start_angle_deg), static_cast<int>(slice.end_angle_deg));
-
-        double start_rad = slice.start_angle_deg * M_PI / 180.0;
-        double end_rad = slice.end_angle_deg * M_PI / 180.0;
-
-        // Yayýn baþlangýç ve bitiþ noktalarýný hesapla (Y ekseni aþaðý doðru artar)
-        // GDI+'da veya benzeri sistemlerde Y genellikle yukarý doðru artar, bu yüzden sinüs negatif olur.
-        // Ancak I-See-Bytes'ýn Line fonksiyonunun nasýl çalýþtýðýna baðlý.
-        // Ekran koordinatlarý (sol üst 0,0, Y aþaðý) için sinüs pozitif kalmalý.
-        int x_start_on_arc = center_x + static_cast<int>(radius * cos(start_rad));
-        int y_start_on_arc = center_y + static_cast<int>(radius * sin(start_rad));
-
-        int x_end_on_arc = center_x + static_cast<int>(radius * cos(end_rad));
-        int y_end_on_arc = center_y + static_cast<int>(radius * sin(end_rad));
-
+        // Yayýn baþlangýç ve bitiþ noktalarýný merkeze birleþtiren çizgiler
+        double start_rad_lines = slice.start_angle_deg * M_PI / 180.0;
+        double end_rad_lines = slice.end_angle_deg * M_PI / 180.0;
+        int x_start_on_arc = center_x + static_cast<int>(radius * cos(start_rad_lines));
+        int y_start_on_arc = center_y + static_cast<int>(radius * sin(start_rad_lines));
+        int x_end_on_arc = center_x + static_cast<int>(radius * cos(end_rad_lines));
+        int y_end_on_arc = center_y + static_cast<int>(radius * sin(end_rad_lines));
         Line(img, center_x, center_y, x_start_on_arc, y_start_on_arc, slice.color);
         Line(img, center_x, center_y, x_end_on_arc, y_end_on_arc, slice.color);
-		// Yayýn baþlangýç ve bitiþ noktalarýný birleþtir
-
-        int num_fill_lines = radius * 3000; // Yoðunluða göre ayarla (örn: radius kadar veya yarýsý)
-        for (int j = 0; j <= num_fill_lines; ++j) {
-            double angle_rad = (slice.start_angle_deg + (slice.end_angle_deg - slice.start_angle_deg) * ((double)j / num_fill_lines)) * M_PI / 180.0;
-            int x_on_arc = center_x + static_cast<int>(radius * cos(angle_rad));
-            int y_on_arc = center_y + static_cast<int>(radius * sin(angle_rad));
-            Line(img, center_x, center_y, x_on_arc, y_on_arc, slice.color);
-        }
-        // Ardýndan dýþ yayý ve merkezden kenarlara çizgileri tekrar çizerek hatlarý belirginleþtir.
-        TiltedEllipseArc(img, center_x, center_y, radius, radius, 0, slice.color, static_cast<int>(slice.start_angle_deg), static_cast<int>(slice.end_angle_deg));
-        Line(img, center_x, center_y, x_start_on_arc, y_start_on_arc, slice.color); // x_start_on_arc vb. daha önce hesaplanmýþtý
-        Line(img, center_x, center_y, x_end_on_arc, y_end_on_arc, slice.color);
-    
-    
     }
 
+    // Lejantý Çiz
+    int legend_x_base = center_x + radius + legend_initial_x_offset;
+    int legend_y_base = top_margin_for_title + legend_initial_y_offset;
+    for (size_t i = 0; i < slices_param.size(); ++i) {
+        const auto& slice = slices_param[i];
+        int current_y_for_elements = legend_y_base + static_cast<int>(i * legend_item_spacing_y);
 
-    // Lejant / Etiketler
-    int legend_x_start = center_x + radius + legend_initial_x_offset;
-    int legend_y_start = top_margin_for_title + legend_initial_y_offset;
+        // Lejantýn resim dýþýna taþmasýný engelle
+        if (current_y_for_elements + legend_color_box_size > image_height - 5) break;
 
-    for (size_t i = 0; i < slices.size(); ++i) {
-        const auto& slice = slices[i];
-        // Lejantýn Y pozisyonu, metnin dikeyde ortalanmasý için metin yüksekliðinin yarýsý (~10px) düþülerek
-        int current_y_for_text = legend_y_start + i * legend_item_spacing_y;
-        int current_y_for_box = current_y_for_text; // Kutu ve metin ayný hizada baþlasýn
-
-        if (current_y_for_box + legend_color_box_size > image_height - 5) break; // Lejant resim dýþýna taþýyorsa çizme
-
-        FillRect(img, legend_x_start, current_y_for_box, legend_color_box_size, legend_color_box_size, slice.color);
-
+        // Renk kutucuðu
+        FillRect(img, legend_x_base, current_y_for_elements, legend_color_box_size, legend_color_box_size, slice.color);
+        // Etiket metni
         char legend_text[100];
         sprintf_s(legend_text, sizeof(legend_text), "%s (%.1f%%)", slice.label.c_str(), slice.percentage);
-        Impress12x20(img, legend_x_start + legend_color_box_size + 5, current_y_for_text, legend_text, textcolor); // Renk kutusundan 5px saða
+        Impress12x20(img, legend_x_base + legend_color_box_size + 5, current_y_for_elements, legend_text, textcolor);
     }
 }
 
-
-// --- GUI Uygulamasý ---
-void GenerateAndDisplayPieChart_Main_GUI(const std::vector<std::pair<std::string, double>>& input_raw_data) {
-    std::vector<PieSliceInfo> local_slices_info; // Fonksiyon içinde oluþturulsun
-
+// --- GenerateAndDisplayPieChart_Main_GUI Implementasyonu ---
+void GenerateAndDisplayPieChart_Main_GUI(const std::vector<std::pair<std::string, double>>& input_raw_data, const char* dynamic_title) {
+    std::vector<PieSliceInfo> local_slices_info_list;
     double total_value = 0;
-    for (const auto& item : input_raw_data) { // Gelen parametreyi kullan
-        total_value += item.second;
+
+    if (!input_raw_data.empty()) {
+        for (const auto& item : input_raw_data) {
+            if (item.second > 0) total_value += item.second; // Sadece pozitif deðerleri topla
+        }
     }
 
-    if (total_value > 1e-9) {
-        double current_angle_deg = 0;
-        std::vector<unsigned int> colors = {
-            0xFFE91E63, 0xFF9C27B0, 0xFF2196F3, 0xFF4CAF50, 0xFFFFC107, 0xFFFF5722,
-            0xFF795548, 0xFF607D8B, 0xFF00BCD4, 0xFF8BC34A // Daha fazla renk ekle
+    if (total_value > 1e-9 && !input_raw_data.empty()) {
+        double current_angle_deg = 0; // Baþlangýç açýsý (genellikle saat 3 yönü)
+        std::vector<unsigned int> colors = { // Daha canlý bir renk paleti
+            0xFFE53935, // Kýrmýzý
+            0xFF1E88E5, // Mavi
+            0xFF43A047, // Yeþil
+            0xFFFFB300, // Amber/Sarý
+            0xFF8E24AA, // Mor
+            0xFF00ACC1, // Cyan
+            0xFFFDD835, // Koyu Sarý
+            0xFFD81B60, // Pembe
+            0xFF546E7A  // Mavi Gri
         };
         int color_index = 0;
 
-        for (const auto& item : input_raw_data) { // Gelen parametreyi kullan
+        for (size_t idx = 0; idx < input_raw_data.size(); ++idx) {
+            const auto& item = input_raw_data[idx];
+            if (item.second <= 0) continue; // Negatif veya sýfýr deðerleri atla
+
             PieSliceInfo slice;
-            slice.label = item.first; // Etiket için ASCII karakterler kullanmaya devam et
+            slice.label = item.first; // Türkçe karakter sorununu çözmek için ASCII kullanýn
             slice.value = item.second;
             slice.percentage = (item.second / total_value) * 100.0;
             slice.start_angle_deg = current_angle_deg;
-            slice.end_angle_deg = current_angle_deg + (slice.percentage / 100.0) * 360.0;
-            // Küçük yüzdeli dilimlerin yayýnýn en az 1 derece olmasý için (görsel olarak)
-            if (slice.end_angle_deg - slice.start_angle_deg < 1.0 && slice.percentage > 0) {
-                slice.end_angle_deg = slice.start_angle_deg + 1.0;
+            double slice_angle_span = (slice.percentage / 100.0) * 360.0;
+
+            // Çok küçük yüzdeli dilimlerin bile en azýndan biraz görünür olmasý için minimum açý
+            if (slice_angle_span < 0.5 && slice.percentage > 0.001) slice_angle_span = 0.5;
+            // Eðer dilim çok küçükse ve açý sýfýrsa, son dilimdeysek ve boþluk kalmýþsa o boþluðu alsýn
+            if (idx == input_raw_data.size() - 1 && (current_angle_deg + slice_angle_span < 359.5)) {
+                slice_angle_span = 360.0 - current_angle_deg;
             }
+
+            slice.end_angle_deg = current_angle_deg + slice_angle_span;
+
+
             slice.color = colors[color_index % colors.size()];
             color_index++;
-            local_slices_info.push_back(slice);
+            local_slices_info_list.push_back(slice);
             current_angle_deg = slice.end_angle_deg;
         }
+        // Son dilimin tam 360'a gelmesini saðlamak (eðer toplam 360 deðilse)
+        if (!local_slices_info_list.empty() && local_slices_info_list.back().end_angle_deg < 359.9) {
+            local_slices_info_list.back().end_angle_deg = 360.0;
+        }
     }
-    current_pie_slices_info = local_slices_info; // Global'e kopyala
 
-    const char* pie_chart_title_text = "Dinamik Veri ile Pasta Grafik"; // Baþlýðý deðiþtirebilirsin
-    int img_w = 700;
-    int img_h = 450;
-    // Bu global deðiþkenlerin CreatePieChart tarafýndan kullanýlacaðýný unutma
-    pie_chart_center_x_global = 220; // Lejant için saðda daha fazla yer býrakmak adýna biraz sola
-    pie_chart_center_y_global = img_h / 2 + 10;
-    pie_chart_radius_global = (img_h / 2) - 40; // Yüksekliðe göre yarýçapý ayarla (baþlýk ve alt boþluk için)
-    // Yarýçapý biraz küçülttüm ki lejant daha rahat sýðsýn
+    // Grafik için genel parametreler
+    int img_w = 720; // Çerçeve geniþliðiyle uyumlu
+    int img_h = 500; // Çerçeve yüksekliðiyle uyumlu
 
-    unsigned int bg_color_param = 0xFFFAFAFA;
-    unsigned int bar_col_param_dummy = 0; // Pasta grafikte bar rengi yok, dilim renkleri var
-    unsigned int axis_color_param_dummy = 0; // Pasta grafikte eksen rengi yok
-    unsigned int text_color_param = 0xFF000000;
+    // Pasta grafiðin merkezini ve yarýçapýný hesapla
+    int defined_top_margin_for_title = 30; // CreatePieChart içindekiyle uyumlu olmalý
+    int approx_legend_width = 250; // Lejant için yaklaþýk geniþlik tahmini
+
+    // Pastanýn çizilebileceði maksimum yarýçapý belirle
+    // Yükseklikten: (toplam yükseklik - baþlýk marjý - alt marj) / 2
+    int radius_from_height = (img_h - defined_top_margin_for_title - 20) / 2;
+    // Geniþlikten: (toplam geniþlik - lejant geniþliði - sol/sað marjlar) / 2
+    int radius_from_width = (img_w - approx_legend_width - 50) / 2; // 50px sol/sað toplam marj
+
+    int radius_val = std::min(radius_from_height, radius_from_width);
+    if (radius_val < 20) radius_val = 20; // Minimum yarýçap
+
+    // Merkez X: Yarýçap + sol marj
+    int center_x_val = radius_val + 30; // 30px sol marj
+    // Merkez Y: Baþlýk marjý + yarýçap (veya dikeyde ortala)
+    int center_y_val = defined_top_margin_for_title + radius_val + 10; // 10px baþlýk altý boþluk
 
 
-    CreatePieChart(pie_chart_image_global, current_pie_slices_info, pie_chart_title_text,
-        img_w, img_h, pie_chart_center_x_global, pie_chart_center_y_global, pie_chart_radius_global,
-        bg_color_param, text_color_param); // barcolor ve axiscolor dummy
+    unsigned int bg_color_param = 0xFFF5F5F5;
+    unsigned int text_color_param = 0xFF1A1A1A; // Biraz daha koyu metin
 
-    DisplayImage(FRM_PieChart_Display, pie_chart_image_global);
+    CreatePieChart(pie_chart_image_global_obj, local_slices_info_list, dynamic_title, // Dinamik baþlýðý kullan
+        img_w, img_h, center_x_val, center_y_val, radius_val,
+        bg_color_param, text_color_param);
+
+    DisplayImage(FRM_PieChart_Display_Handle, pie_chart_image_global_obj);
 }
 
-
-    // Grafik parametreleri
-    const char* pie_chart_title_text = "Departman Harcama Dagilimi"; // ASCII
-    int img_w = 700; // Resim geniþliði
-    int img_h = 450; // Resim yüksekliði
-    int pie_center_x = 200; // Pasta merkez X (sol marjdan sonra)
-    int pie_center_y = img_h / 2 + 10; // Pasta merkez Y (baþlýktan sonra ortala)
-    int pie_radius = 150;
-
-    CreatePieChart(pie_chart_image_global, slices_info, pie_chart_title_text,
-        img_w, img_h, pie_center_x, pie_center_y, pie_radius,
-        0xFFFAFAFA, 0xFF000000);
-
-    DisplayImage(FRM_PieChart_Display, pie_chart_image_global);
+// --- Test Fonksiyonlarý ---
+void TestPieChartWithData1() {
+    std::vector<std::pair<std::string, double>> data1 = {
+        {"Yazilim Gelistirme", 45.0},
+        {"Donanim Alimlari", 25.0},
+        {"Teknik Destek Giderleri", 15.0},
+        {"Egitimler", 10.0},
+        {"Danismanlik", 5.0}
+    };
+    GenerateAndDisplayPieChart_Main_GUI(data1, "Proje Harcamalari Dagilimi");
 }
 
+void TestPieChartWithData2() {
+    std::vector<std::pair<std::string, double>> data2 = {
+        {"Elma", 120.0}, {"Armut", 80.0}, {"Muz", 150.0},
+        {"Cilek", 95.0}, {"Portakal", 110.0}, {"Kivi", 70.0},
+        {"Uzum", 60.0}, {"Ananas", 40.0}
+    };
+    GenerateAndDisplayPieChart_Main_GUI(data2, "Meyve Stok Durumu (Kg)");
+}
+
+// --- ICGUI Fonksiyonlarý ---
 void ICGUI_Create() {
-    ICG_MWSize(750, 550);
-    ICG_MWTitle("Pasta Grafik Uygulamasi - I-See-Bytes");
+    ICG_MWSize(770, 580); // Ana pencere boyutu
+    ICG_MWTitle("Dinamik Pasta Grafik - I-See-Bytes");
 }
 
 void ICGUI_main() {
-    FRM_PieChart_Display = ICG_FramePanel(10, 10, 720, 500);
-    ICG_Button(10, 520, 250, 25, "Pastayi Yeniden Ciz", GenerateAndDisplayPieChart_Main_GUI);
-    GenerateAndDisplayPieChart_Main_GUI();
+    // Panel boyutunu GenerateAndDisplay... içindeki img_w, img_h ile eþleþtir
+    FRM_PieChart_Display_Handle = ICG_FramePanel(10, 10, 720, 500);
+
+    ICG_Button(10, 520, 220, 25, "Proje Harcamalari", TestPieChartWithData1); // Buton metni güncellendi
+    ICG_Button(240, 520, 220, 25, "Meyve Stok Durumu", TestPieChartWithData2); // Buton metni güncellendi
+
+    TestPieChartWithData1(); // Baþlangýçta bir veri seti ve baþlýkla çizdir
 }
