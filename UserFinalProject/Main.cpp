@@ -80,7 +80,23 @@ void CreatePieChart(ICBYTES& img, const std::vector<PieSliceInfo>& slices,
 
         Line(img, center_x, center_y, x_start_on_arc, y_start_on_arc, slice.color);
         Line(img, center_x, center_y, x_end_on_arc, y_end_on_arc, slice.color);
+		// Yayýn baþlangýç ve bitiþ noktalarýný birleþtir
+
+        int num_fill_lines = radius * 3000; // Yoðunluða göre ayarla (örn: radius kadar veya yarýsý)
+        for (int j = 0; j <= num_fill_lines; ++j) {
+            double angle_rad = (slice.start_angle_deg + (slice.end_angle_deg - slice.start_angle_deg) * ((double)j / num_fill_lines)) * M_PI / 180.0;
+            int x_on_arc = center_x + static_cast<int>(radius * cos(angle_rad));
+            int y_on_arc = center_y + static_cast<int>(radius * sin(angle_rad));
+            Line(img, center_x, center_y, x_on_arc, y_on_arc, slice.color);
+        }
+        // Ardýndan dýþ yayý ve merkezden kenarlara çizgileri tekrar çizerek hatlarý belirginleþtir.
+        TiltedEllipseArc(img, center_x, center_y, radius, radius, 0, slice.color, static_cast<int>(slice.start_angle_deg), static_cast<int>(slice.end_angle_deg));
+        Line(img, center_x, center_y, x_start_on_arc, y_start_on_arc, slice.color); // x_start_on_arc vb. daha önce hesaplanmýþtý
+        Line(img, center_x, center_y, x_end_on_arc, y_end_on_arc, slice.color);
+    
+    
     }
+
 
     // Lejant / Etiketler
     int legend_x_start = center_x + radius + legend_initial_x_offset;
