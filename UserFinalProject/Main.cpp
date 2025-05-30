@@ -80,7 +80,7 @@ void CreatePieChart(ICBYTES& img, const std::vector<PieSliceInfo>& slices_param,
         // Yelpaze Yöntemi ile Basit Dolgu:
         double start_rad_fill = slice.start_angle_deg * M_PI / 180.0;
         double end_rad_fill = slice.end_angle_deg * M_PI / 180.0;
-        int num_fill_lines = radius; // Dolgu yoðunluðu (daha fazla çizgi = daha yoðun)
+        int num_fill_lines = radius * 1000; // Dolgu yoðunluðu (daha fazla çizgi = daha yoðun)
         if (num_fill_lines <= 0) num_fill_lines = 1; // En az bir çizgi
         // Açýsal adým (radyan cinsinden)
         double angle_step_rad_fill = (fabs(end_rad_fill - start_rad_fill) < 1e-6 || num_fill_lines == 0) ? 0 : (end_rad_fill - start_rad_fill) / static_cast<double>(num_fill_lines);
@@ -187,7 +187,7 @@ void GenerateAndDisplayPieChart_Main_GUI(const std::vector<std::pair<std::string
     }
 
     // Grafik için genel parametreler
-    int img_w = 720; // Çerçeve geniþliðiyle uyumlu
+    int img_w = 950; // Çerçeve geniþliðiyle uyumlu
     int img_h = 500; // Çerçeve yüksekliðiyle uyumlu
 
     // Pasta grafiðin merkezini ve yarýçapýný hesapla
@@ -240,9 +240,26 @@ void TestPieChartWithData2() {
     GenerateAndDisplayPieChart_Main_GUI(data2, "Meyve Stok Durumu (Kg)");
 }
 
+void TestPieChartWithData3() {
+    std::vector<std::pair<std::string, double>> data3 = {
+        {"Elektronik", 320.0}, {"Giyim", 210.0}, {"Market", 450.0},
+        {"Mobilya", 180.0}, {"Kitap", 95.0}, {"Oyuncak", 130.0}
+    };
+    GenerateAndDisplayPieChart_Main_GUI(data3, "Kategori Bazli Satis Dagilimi");
+}
+
+void TestPieChartWithData4() {
+    std::vector<std::pair<std::string, double>> data4 = {
+        {"Kira", 2500.0}, {"Fatura", 850.0}, {"Yiyecek", 1250.0},
+        {"Ulasim", 600.0}, {"Eglence", 400.0}, {"Diger", 300.0}
+    };
+    GenerateAndDisplayPieChart_Main_GUI(data4, "Aylik Gider Dagilimi (TL)");
+}
+
+
 // --- ICGUI Fonksiyonlarý ---
 void ICGUI_Create() {
-    ICG_MWSize(770, 580); // Ana pencere boyutu
+    ICG_MWSize(1000, 600); // Ana pencere boyutu
     ICG_MWTitle("Dinamik Pasta Grafik - I-See-Bytes");
 }
 
@@ -252,6 +269,8 @@ void ICGUI_main() {
 
     ICG_Button(10, 520, 220, 25, "Proje Harcamalari", TestPieChartWithData1); // Buton metni güncellendi
     ICG_Button(240, 520, 220, 25, "Meyve Stok Durumu", TestPieChartWithData2); // Buton metni güncellendi
+    ICG_Button(470, 520, 220, 25, "Kategori Bazlý Satýþ Daðýlýmý", TestPieChartWithData3); // Buton metni güncellendi
+    ICG_Button(700, 520, 220, 25, "Aylýk Gider Daðýlýmý (TL)", TestPieChartWithData4); // Buton metni güncellendi
 
     TestPieChartWithData1(); // Baþlangýçta bir veri seti ve baþlýkla çizdir
 }
