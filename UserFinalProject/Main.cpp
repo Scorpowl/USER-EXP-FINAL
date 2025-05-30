@@ -120,43 +120,62 @@ void CreatePieChart(ICBYTES& img, const std::vector<PieSliceInfo>& slices,
 
 
 // --- GUI Uygulamasý ---
-void GenerateAndDisplayPieChart_Main_GUI() {
-    // Örnek Veri Seti
-    std::vector<std::pair<std::string, double>> raw_data = {
-        {"Ar-Ge", 25.0},
-        {"Pazarlama", 30.0},
-        {"Uretim", 15.0},
-        {"Yonetim", 20.0},
-        {"Diger", 10.0}
-    };
+void GenerateAndDisplayPieChart_Main_GUI(const std::vector<std::pair<std::string, double>>& input_raw_data) {
+    std::vector<PieSliceInfo> local_slices_info; // Fonksiyon içinde oluþturulsun
 
     double total_value = 0;
-    for (const auto& item : raw_data) {
+    for (const auto& item : input_raw_data) { // Gelen parametreyi kullan
         total_value += item.second;
     }
 
-    std::vector<PieSliceInfo> slices_info;
-    if (total_value > 1e-9) { // Sýfýra bölme hatasýný engelle
+    if (total_value > 1e-9) {
         double current_angle_deg = 0;
-        // Renk paleti (daha fazla dilim için geniþletilebilir)
         std::vector<unsigned int> colors = {
-            0xFFE91E63, 0xFF9C27B0, 0xFF2196F3, 0xFF4CAF50, 0xFFFFC107, 0xFFFF5722
+            0xFFE91E63, 0xFF9C27B0, 0xFF2196F3, 0xFF4CAF50, 0xFFFFC107, 0xFFFF5722,
+            0xFF795548, 0xFF607D8B, 0xFF00BCD4, 0xFF8BC34A // Daha fazla renk ekle
         };
         int color_index = 0;
 
-        for (const auto& item : raw_data) {
+        for (const auto& item : input_raw_data) { // Gelen parametreyi kullan
             PieSliceInfo slice;
-            slice.label = item.first;
+            slice.label = item.first; // Etiket için ASCII karakterler kullanmaya devam et
             slice.value = item.second;
             slice.percentage = (item.second / total_value) * 100.0;
             slice.start_angle_deg = current_angle_deg;
             slice.end_angle_deg = current_angle_deg + (slice.percentage / 100.0) * 360.0;
+            // Küçük yüzdeli dilimlerin yayýnýn en az 1 derece olmasý için (görsel olarak)
+            if (slice.end_angle_deg - slice.start_angle_deg < 1.0 && slice.percentage > 0) {
+                slice.end_angle_deg = slice.start_angle_deg + 1.0;
+            }
             slice.color = colors[color_index % colors.size()];
             color_index++;
-            slices_info.push_back(slice);
+            local_slices_info.push_back(slice);
             current_angle_deg = slice.end_angle_deg;
         }
     }
+    current_pie_slices_info = local_slices_info; // Global'e kopyala
+
+    const char* pie_chart_title_text = "Dinamik Veri ile Pasta Grafik"; // Baþlýðý deðiþtirebilirsin
+    int img_w = 700;
+    int img_h = 450;
+    // Bu global deðiþkenlerin CreatePieChart tarafýndan kullanýlacaðýný unutma
+    pie_chart_center_x_global = 220; // Lejant için saðda daha fazla yer býrakmak adýna biraz sola
+    pie_chart_center_y_global = img_h / 2 + 10;
+    pie_chart_radius_global = (img_h / 2) - 40; // Yüksekliðe göre yarýçapý ayarla (baþlýk ve alt boþluk için)
+    // Yarýçapý biraz küçülttüm ki lejant daha rahat sýðsýn
+
+    unsigned int bg_color_param = 0xFFFAFAFA;
+    unsigned int bar_col_param_dummy = 0; // Pasta grafikte bar rengi yok, dilim renkleri var
+    unsigned int axis_color_param_dummy = 0; // Pasta grafikte eksen rengi yok
+    unsigned int text_color_param = 0xFF000000;
+
+
+    CreatePieChart(pie_chart_image_global, current_pie_slices_info, pie_chart_title_text,
+        img_w, img_h, pie_chart_center_x_global, pie_chart_center_y_global, pie_chart_radius_global,
+        bg_color_param, text_color_param); // barcolor ve axiscolor dummy
+
+    DisplayImage(FRM_PieChart_Display, pie_chart_image_global);
+}
 
 
     // Grafik parametreleri
