@@ -1,7 +1,6 @@
-// main.cpp
-#include "icbytes.h"   // Bu dosyanýn projenizde olmasý lazým
-#include "ic_media.h" // BU DOSYANIN PROJENÝZDE OLMASI LAZIM! C1083 hatasýnýn sebebi bu.
-#include "icb_gui.h"   // Bu dosyanýn projenizde olmasý lazým
+#include "icbytes.h"
+#include "ic_media.h"
+#include "icb_gui.h"
 
 #include <vector>
 #include <string>
@@ -9,7 +8,7 @@
 #include <cmath>
 #include <cstdio>
 #include <iostream>
-#include <algorithm> // std::min ve std::max için (E0040 hatasý için önemli)
+#include <algorithm>
 
 #ifndef M_PI, min
 #define M_PI 3.14159265358979323846
@@ -25,7 +24,6 @@ struct PieSliceInfo {
     double end_angle_deg;
     unsigned int color;
 
-    // Baþlatýlmamýþ üye uyarýsýný gidermek için varsayýlan constructor
     PieSliceInfo() : value(0.0), percentage(0.0), start_angle_deg(0.0), end_angle_deg(0.0), color(0U) {}
 };
 
@@ -41,7 +39,7 @@ void CreatePieChart(ICBYTES& img, const std::vector<PieSliceInfo>& slices_param,
 
 void GenerateAndDisplayPieChart_Main_GUI(const std::vector<std::pair<std::string, double>>& input_raw_data, const char* dynamic_title);
 void TestPieChartWithData1();
-void TestPieChartWithData2();
+void TestPieChartWithData2(); 
 
 
 // --- CreatePieChart Fonksiyonu Implementasyonu ---
@@ -82,11 +80,11 @@ void CreatePieChart(ICBYTES& img, const std::vector<PieSliceInfo>& slices_param,
         double end_rad_fill = slice.end_angle_deg * M_PI / 180.0;
         int num_fill_lines = radius * 1000; // Dolgu yoðunluðu (daha fazla çizgi = daha yoðun)
         if (num_fill_lines <= 0) num_fill_lines = 1; // En az bir çizgi
-        // Açýsal adým (radyan cinsinden)
+        // Açýsal adým
         double angle_step_rad_fill = (fabs(end_rad_fill - start_rad_fill) < 1e-6 || num_fill_lines == 0) ? 0 : (end_rad_fill - start_rad_fill) / static_cast<double>(num_fill_lines);
 
 
-        if (fabs(end_rad_fill - start_rad_fill) > 1e-6) { // Sadece anlamlý bir açý varsa doldur
+        if (fabs(end_rad_fill - start_rad_fill) > 1e-6) {
             for (int j = 0; j <= num_fill_lines; ++j) {
                 double current_fill_angle_rad = start_rad_fill + j * angle_step_rad_fill;
                 int x_on_arc_for_fill = center_x + static_cast<int>(radius * cos(current_fill_angle_rad));
@@ -96,7 +94,7 @@ void CreatePieChart(ICBYTES& img, const std::vector<PieSliceInfo>& slices_param,
         }
 
         // Dilim hatlarýný dolgudan sonra tekrar çizerek belirginleþtir
-        TiltedEllipseArc(img, center_x, center_y, radius, radius, 0, /*ellipse_tilt_angle*/
+        TiltedEllipseArc(img, center_x, center_y, radius, radius, 0,
             slice.color, static_cast<int>(slice.start_angle_deg), static_cast<int>(slice.end_angle_deg));
         // Yayýn baþlangýç ve bitiþ noktalarýný merkeze birleþtiren çizgiler
         double start_rad_lines = slice.start_angle_deg * M_PI / 180.0;
@@ -140,7 +138,7 @@ void GenerateAndDisplayPieChart_Main_GUI(const std::vector<std::pair<std::string
     }
 
     if (total_value > 1e-9 && !input_raw_data.empty()) {
-        double current_angle_deg = 0; // Baþlangýç açýsý (genellikle saat 3 yönü)
+        double current_angle_deg = 0; // Baþlangýç açýsý 
         std::vector<unsigned int> colors = { // Daha canlý bir renk paleti
             0xFFE53935, // Kýrmýzý
             0xFF1E88E5, // Mavi
@@ -159,7 +157,7 @@ void GenerateAndDisplayPieChart_Main_GUI(const std::vector<std::pair<std::string
             if (item.second <= 0) continue; // Negatif veya sýfýr deðerleri atla
 
             PieSliceInfo slice;
-            slice.label = item.first; // Türkçe karakter sorununu çözmek için ASCII kullanýn
+            slice.label = item.first;
             slice.value = item.second;
             slice.percentage = (item.second / total_value) * 100.0;
             slice.start_angle_deg = current_angle_deg;
@@ -167,7 +165,7 @@ void GenerateAndDisplayPieChart_Main_GUI(const std::vector<std::pair<std::string
 
             // Çok küçük yüzdeli dilimlerin bile en azýndan biraz görünür olmasý için minimum açý
             if (slice_angle_span < 0.5 && slice.percentage > 0.001) slice_angle_span = 0.5;
-            // Eðer dilim çok küçükse ve açý sýfýrsa, son dilimdeysek ve boþluk kalmýþsa o boþluðu alsýn
+            // Eðer dilim çok küçükse ve açý sýfýrsa, son dilimdeysek ve boþluk kalmýþsa o boþluðu almalý
             if (idx == input_raw_data.size() - 1 && (current_angle_deg + slice_angle_span < 359.5)) {
                 slice_angle_span = 360.0 - current_angle_deg;
             }
@@ -187,8 +185,8 @@ void GenerateAndDisplayPieChart_Main_GUI(const std::vector<std::pair<std::string
     }
 
     // Grafik için genel parametreler
-    int img_w = 950; // Çerçeve geniþliðiyle uyumlu
-    int img_h = 500; // Çerçeve yüksekliðiyle uyumlu
+    int img_w = 950;
+    int img_h = 500; 
 
     // Pasta grafiðin merkezini ve yarýçapýný hesapla
     int defined_top_margin_for_title = 30; // CreatePieChart içindekiyle uyumlu olmalý
@@ -267,10 +265,10 @@ void ICGUI_main() {
     // Panel boyutunu GenerateAndDisplay... içindeki img_w, img_h ile eþleþtir
     FRM_PieChart_Display_Handle = ICG_FramePanel(10, 10, 720, 500);
 
-    ICG_Button(10, 520, 220, 25, "Proje Harcamalari", TestPieChartWithData1); // Buton metni güncellendi
-    ICG_Button(240, 520, 220, 25, "Meyve Stok Durumu", TestPieChartWithData2); // Buton metni güncellendi
-    ICG_Button(470, 520, 220, 25, "Kategori Bazlý Satýþ Daðýlýmý", TestPieChartWithData3); // Buton metni güncellendi
-    ICG_Button(700, 520, 220, 25, "Aylýk Gider Daðýlýmý (TL)", TestPieChartWithData4); // Buton metni güncellendi
+    ICG_Button(10, 520, 220, 25, "Proje Harcamalari", TestPieChartWithData1); 
+    ICG_Button(240, 520, 220, 25, "Meyve Stok Durumu", TestPieChartWithData2); 
+    ICG_Button(470, 520, 220, 25, "Kategori Bazlý Satýþ Daðýlýmý", TestPieChartWithData3); 
+    ICG_Button(700, 520, 220, 25, "Aylýk Gider Daðýlýmý (TL)", TestPieChartWithData4);
 
     TestPieChartWithData1(); // Baþlangýçta bir veri seti ve baþlýkla çizdir
 }
